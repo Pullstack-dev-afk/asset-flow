@@ -1,0 +1,4 @@
+import type { AssetStatus } from '@/lib/types';
+
+const labels: Record<AssetStatus, string> = { assigned: 'Assigned', available: 'Available', maintenance: 'Maintenance', retired: 'Retired' };
+export function StatusPill({ status }: { status: AssetStatus }) { return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${status === 'assigned' ? 'bg-sage text-moss' : status === 'available' ? 'bg-[#f4eadb] text-[#9a6827]' : status === 'maintenance' ? 'bg-[#f0e4e1] text-[#a25c4c]' : 'bg-[#e8e9e7] text-ink/55'}`}><i className="h-1.5 w-1.5 rounded-full bg-current" />{labels[status]}</span>; }
