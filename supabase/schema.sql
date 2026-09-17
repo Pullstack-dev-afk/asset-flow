@@ -1,4 +1,4 @@
-create type public.user_role as enum ('admin', 'viewer');
+create type public.user_role as enum ('admin', 'editor', 'viewer');
 create type public.asset_status as enum ('available', 'assigned', 'maintenance', 'retired');
 
 create table public.profiles (id uuid primary key references auth.users(id) on delete cascade, full_name text not null, email text not null, role public.user_role not null default 'viewer', avatar_url text, created_at timestamptz not null default now());
@@ -21,8 +21,18 @@ create policy "Authenticated users can read employees" on public.employees for s
 create policy "Authenticated users can read assets" on public.assets for select to authenticated using (true);
 create policy "Authenticated users can read asset history" on public.asset_history for select to authenticated using (true);
 create or replace function public.is_admin() returns boolean language sql security definer set search_path = public as $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'); $$;
-create policy "Admins can manage categories" on public.categories for all to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can manage locations" on public.locations for all to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can manage employees" on public.employees for all to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can manage assets" on public.assets for all to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can create history" on public.asset_history for insert to authenticated with check (public.is_admin());
+create policy "Admins can manage profiles" on public.profiles for update to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Editors can manage categories" on public.categories for all to authenticated using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))) with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor')));
+create policy "Editors can manage locations" on public.locations for all to authenticated using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))) with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor')));
+create policy "Editors can manage employees" on public.employees for all to authenticated using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))) with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor')));
+create policy "Editors can manage assets" on public.assets for all to authenticated using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor'))) with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor')));
+create policy "Editors can create history" on public.asset_history for insert to authenticated with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin', 'editor')));
+
+create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+	insert into public.profiles (id, full_name, email) values (new.id, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)), new.email);
+	return new;
+end;
+$$;
+
+create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();

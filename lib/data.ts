@@ -1,5 +1,19 @@
 import { createClient } from '@/lib/supabase/server';
-import type { Asset, Employee, HistoryEvent } from '@/lib/types';
+import type { Asset, Employee, HistoryEvent, UserRole } from '@/lib/types';
+
+export async function getCurrentProfile() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('profiles').select('id, full_name, email, role').eq('id', user.id).maybeSingle();
+  return data as { id: string; full_name: string; email: string; role: UserRole } | null;
+}
+
+export async function getProfiles() {
+  const supabase = await createClient();
+  const { data } = await supabase.from('profiles').select('id, full_name, email, role, created_at').order('created_at', { ascending: true });
+  return (data ?? []) as { id: string; full_name: string; email: string; role: UserRole; created_at: string }[];
+}
 
 export async function getAssets(): Promise<Asset[]> {
   const supabase = await createClient();

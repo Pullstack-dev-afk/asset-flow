@@ -10,7 +10,8 @@ export async function middleware(request: NextRequest) {
     },
   });
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user && request.nextUrl.pathname !== '/login') {
+  const isPublicRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup';
+  if (!user && !isPublicRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     return NextResponse.redirect(loginUrl);
