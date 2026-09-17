@@ -716,6 +716,9 @@ video {
 .h-full {
   height: 100%;
 }
+.min-h-10 {
+  min-height: 2.5rem;
+}
 .min-h-screen {
   min-height: 100vh;
 }
@@ -1285,6 +1288,14 @@ body { margin: 0; font-family: var(--font-dm-sans), sans-serif; background: #f6f
 button, input { font: inherit; }
 ::-moz-selection { background: #d3e1d4; color: #17211f; }
 ::selection { background: #d3e1d4; color: #17211f; }
+@media (max-width: 1023px) {
+	.app-shell { padding-top: 4.5rem; }
+	.app-shell:has(.bg-paper) { padding-top: 0; }
+}
+@media (max-width: 640px) {
+	.app-shell { overflow-x: hidden; }
+	button, a, select { min-height: 40px; }
+}
 .placeholder\:text-ink\/35::-moz-placeholder {
   color: rgb(23 33 31 / 0.35);
 }
