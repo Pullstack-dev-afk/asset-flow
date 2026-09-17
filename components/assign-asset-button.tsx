@@ -15,7 +15,7 @@ export function AssignAssetButton({ employeeId, employeeName }: { employeeId: st
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (!open) return; createClient().from('assets').select('id, name, asset_tag, assigned_employee_id').order('name').then(({ data, error: queryError }) => { if (queryError) setError(queryError.message); setAssets(data ?? []); }); }, [open]);
+  useEffect(() => { if (!open) return; createClient().from('assets').select('id, name, asset_tag, assigned_employee_id').is('assigned_employee_id', null).not('status', 'in', '(retired,missing)').order('name').then(({ data, error: queryError }) => { if (queryError) setError(queryError.message); setAssets(data ?? []); }); }, [open]);
 
   async function assignAsset() {
     if (!assetId) return;
@@ -24,9 +24,9 @@ export function AssignAssetButton({ employeeId, employeeName }: { employeeId: st
     const client = createClient();
     const { data: userData } = await client.auth.getUser();
     const previous = assets.find((asset) => asset.id === assetId)?.assigned_employee_id;
-    const { error: updateError } = await client.from('assets').update({ assigned_employee_id: employeeId, assigned_location_id: null, status: 'assigned' }).eq('id', assetId);
+    const { error: updateError } = await client.from('assets').update({ assigned_employee_id: employeeId, assigned_location_id: null, assigned_at: new Date().toISOString(), status: 'assigned' }).eq('id', assetId);
     if (updateError) { setError(updateError.message); setSaving(false); return; }
-    const { error: historyError } = await client.from('asset_history').insert({ asset_id: assetId, action: previous ? 'Reassigned' : 'Assigned', from_employee_id: previous, to_employee_id: employeeId, performed_by: userData.user?.id ?? null });
+    const { error: historyError } = await client.from('asset_history').insert({ asset_id: assetId, action: previous ? 'Reassigned' : 'Assigned', from_employee_id: previous, to_employee_id: employeeId, new_status: 'assigned', performed_by: userData.user?.id ?? null });
     if (historyError) { setError(historyError.message); setSaving(false); return; }
     setSaving(false);
     setAssetId('');

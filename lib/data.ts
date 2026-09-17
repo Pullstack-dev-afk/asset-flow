@@ -17,21 +17,21 @@ export async function getProfiles() {
 
 export async function getAssets(): Promise<Asset[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from('assets').select('id, asset_tag, name, status, serial_number, warranty_until, cost, categories(name), employees(full_name), locations(id, name)').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('assets').select('id, asset_tag, name, status, serial_number, manufacturer, model, purchase_date, warranty_until, cost, notes, assigned_at, assigned_employee_id, categories(name), employees(full_name), locations(id, name)').order('created_at', { ascending: false });
   if (error || !data) return [];
   return data.map((asset) => {
     const category = Array.isArray(asset.categories) ? asset.categories[0] : asset.categories;
     const employee = Array.isArray(asset.employees) ? asset.employees[0] : asset.employees;
     const location = Array.isArray(asset.locations) ? asset.locations[0] : asset.locations;
-    return { id: asset.id, assetTag: asset.asset_tag, name: asset.name, category: category?.name ?? 'Uncategorized', categoryColor: '#dbe8dc', status: asset.status, assignee: employee?.full_name ?? null, location: location?.name ?? 'Unassigned', locationId: location?.id ?? null, warrantyUntil: asset.warranty_until ?? 'No warranty', serialNumber: asset.serial_number ?? 'No serial number', value: Number(asset.cost ?? 0) };
+    return { id: asset.id, assetTag: asset.asset_tag, name: asset.name, category: category?.name ?? 'Uncategorized', categoryColor: '#dbe8dc', status: asset.status, assignee: employee?.full_name ?? null, assigneeId: asset.assigned_employee_id ?? null, location: location?.name ?? 'Unassigned', locationId: location?.id ?? null, warrantyUntil: asset.warranty_until ?? 'No warranty', serialNumber: asset.serial_number ?? 'No serial number', manufacturer: asset.manufacturer ?? '', model: asset.model ?? '', purchaseDate: asset.purchase_date ?? null, notes: asset.notes ?? null, assignedAt: asset.assigned_at ?? null, value: Number(asset.cost ?? 0) };
   });
 }
 
 export async function getEmployees(): Promise<Employee[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from('employees').select('id, full_name, email, department, job_title, locations(name), assets(id)').eq('active', true).order('full_name');
+  const { data, error } = await supabase.from('employees').select('id, full_name, email, phone, department, job_title, active, locations(name), assets(id)').order('full_name');
   if (error || !data) return [];
-  return data.map((employee) => { const location = Array.isArray(employee.locations) ? employee.locations[0] : employee.locations; return { id: employee.id, name: employee.full_name, initials: employee.full_name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase(), department: employee.department, role: employee.job_title ?? 'Team member', email: employee.email, assetCount: Array.isArray(employee.assets) ? employee.assets.length : 0, location: location?.name ?? 'Unassigned' }; });
+  return data.map((employee) => { const location = Array.isArray(employee.locations) ? employee.locations[0] : employee.locations; return { id: employee.id, name: employee.full_name, initials: employee.full_name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase(), department: employee.department, role: employee.job_title ?? 'Team member', email: employee.email, phone: employee.phone ?? null, active: employee.active, assetCount: Array.isArray(employee.assets) ? employee.assets.length : 0, location: location?.name ?? 'Unassigned' }; });
 }
 
 export async function getHistory(): Promise<HistoryEvent[]> {
@@ -60,4 +60,26 @@ export async function getDashboardStats() {
   ]);
   const counts = (statuses ?? []).reduce<Record<string, number>>((result, asset) => { result[asset.status] = (result[asset.status] ?? 0) + 1; return result; }, {});
   return { total: total ?? 0, assigned: assigned ?? 0, stored: stored ?? 0, available: counts.available ?? 0, other: (counts.maintenance ?? 0) + (counts.retired ?? 0) };
+}
+
+export async function getAssetDetail(id: string) {
+  const supabase = await createClient();
+  const [{ data: asset }, { data: history }, { data: issues }] = await Promise.all([
+    supabase.from('assets').select('id, asset_tag, name, status, serial_number, manufacturer, model, purchase_date, warranty_until, cost, notes, assigned_at, assigned_employee_id, assigned_location_id, created_at, categories(name), employees(id, full_name, email), locations(id, name, address)').eq('id', id).maybeSingle(),
+    supabase.from('asset_history').select('id, action, created_at, notes, previous_status, new_status, from_employee_id, to_employee_id, from_location_id, to_location_id, profiles(full_name), from_employee:employees!asset_history_from_employee_id_fkey(full_name), to_employee:employees!asset_history_to_employee_id_fkey(full_name), from_location:locations!asset_history_from_location_id_fkey(name), to_location:locations!asset_history_to_location_id_fkey(name)').eq('asset_id', id).order('created_at', { ascending: false }),
+    supabase.from('asset_issues').select('id, description, priority, status, notes, created_at, resolved_at, profiles(full_name)').eq('asset_id', id).order('created_at', { ascending: false }),
+  ]);
+  if (!asset) return null;
+  const category = Array.isArray(asset.categories) ? asset.categories[0] : asset.categories;
+  const employee = Array.isArray(asset.employees) ? asset.employees[0] : asset.employees;
+  const location = Array.isArray(asset.locations) ? asset.locations[0] : asset.locations;
+  return { asset: { ...asset, category: category?.name ?? 'Uncategorized', employee, location }, history: history ?? [], issues: issues ?? [] };
+}
+
+export async function getEmployeeDetail(id: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from('employees').select('id, full_name, email, phone, department, job_title, active, locations(id, name, address), assets(id, asset_tag, name, status, serial_number, manufacturer, model, assigned_at, categories(name), locations(id, name))').eq('id', id).maybeSingle();
+  if (!data) return null;
+  const location = Array.isArray(data.locations) ? data.locations[0] : data.locations;
+  return { ...data, location, assets: data.assets ?? [] };
 }

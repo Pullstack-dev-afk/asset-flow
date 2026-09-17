@@ -1,0 +1,32 @@
+import Link from 'next/link';
+import { ArrowLeft, CalendarDays, ClipboardList, MapPin, UserRound } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { getAssetDetail, getCurrentProfile } from '@/lib/data';
+import { PageHeader } from '@/components/page-header';
+import { StatusPill } from '@/components/status-pill';
+import { AssetActions } from '@/components/asset-actions';
+import { ReportIssueButton } from '@/components/report-issue-button';
+import { IssueList } from '@/components/issue-list';
+
+type Relation = { id?: string; name?: string; full_name?: string } | null;
+
+export default async function AssetDetailPage({ params }: { params: { id: string } }) {
+  const [record, profile] = await Promise.all([getAssetDetail(params.id), getCurrentProfile()]);
+  if (!record) notFound();
+  const { asset, history, issues } = record;
+  const canEdit = profile?.role !== 'viewer';
+  const employee = asset.employee as Relation;
+  const location = asset.location as Relation;
+  return <div className="mx-auto max-w-[1200px] px-6 pb-12 pt-16 sm:px-10 lg:px-14 lg:pt-20">
+    <Link href="/assets" className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-moss hover:underline"><ArrowLeft size={14} />Back to assets</Link>
+    <PageHeader eyebrow="Asset detail" title={asset.name} description={`${asset.asset_tag} ${asset.serial_number ? `· ${asset.serial_number}` : ''}`} />
+    <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+      <div className="space-y-5">
+        <section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.12em] text-ink/40">Current status</p><div className="mt-2"><StatusPill status={asset.status} /></div></div><ReportIssueButton assetId={asset.id} assetName={asset.name} canEdit={canEdit} /></div><div className="mt-6 border-t border-[#edf0ed] pt-5"><AssetActions asset={{ id: asset.id, name: asset.name, status: asset.status, assigned_employee_id: asset.assigned_employee_id, assigned_location_id: asset.assigned_location_id }} canEdit={canEdit} /></div></section>
+        <section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><div className="mb-5 flex items-center gap-2"><ClipboardList size={17} className="text-moss" /><h2 className="font-display text-lg font-semibold">Issues</h2></div><IssueList issues={issues} canEdit={canEdit} /></section>
+        <section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><div className="mb-5 flex items-center gap-2"><CalendarDays size={17} className="text-moss" /><h2 className="font-display text-lg font-semibold">History</h2></div><div className="divide-y divide-[#edf0ed]">{history.length ? history.map((event) => { const actor = (Array.isArray(event.profiles) ? event.profiles[0] : event.profiles) as Relation; const fromEmployee = (Array.isArray(event.from_employee) ? event.from_employee[0] : event.from_employee) as Relation; const toEmployee = (Array.isArray(event.to_employee) ? event.to_employee[0] : event.to_employee) as Relation; const fromLocation = (Array.isArray(event.from_location) ? event.from_location[0] : event.from_location) as Relation; const toLocation = (Array.isArray(event.to_location) ? event.to_location[0] : event.to_location) as Relation; return <div key={event.id} className="py-4 first:pt-0"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-semibold text-ink">{event.action}</p><time className="text-xs text-ink/40">{new Date(event.created_at).toLocaleString()}</time></div><p className="mt-1 text-xs text-ink/50">{actor?.name ?? 'System'}{fromEmployee?.name || fromLocation?.name ? ` · From ${fromEmployee?.name ?? fromLocation?.name}` : ''}{toEmployee?.name || toLocation?.name ? ` · To ${toEmployee?.name ?? toLocation?.name}` : ''}</p>{event.previous_status && <p className="mt-2 text-xs capitalize text-ink/45">{event.previous_status.replace('_', ' ')} → {event.new_status?.replace('_', ' ')}</p>}{event.notes && <p className="mt-2 text-xs text-ink/60">{event.notes}</p>}</div>; }) : <p className="text-sm text-ink/45">No history recorded yet.</p>}</div></section>
+      </div>
+      <aside className="space-y-5"><section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><h2 className="font-display text-lg font-semibold">Asset information</h2><dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 text-sm"><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Type</dt><dd className="mt-1 text-ink/70">{asset.category}</dd></div><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Brand</dt><dd className="mt-1 text-ink/70">{asset.manufacturer || 'Not provided'}</dd></div><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Model</dt><dd className="mt-1 text-ink/70">{asset.model || 'Not provided'}</dd></div><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Asset tag</dt><dd className="mt-1 text-ink/70">{asset.asset_tag}</dd></div><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Serial number</dt><dd className="mt-1 break-words text-ink/70">{asset.serial_number || 'Not provided'}</dd></div><div><dt className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Purchase</dt><dd className="mt-1 text-ink/70">{asset.purchase_date ?? 'Not provided'}</dd></div></dl></section><section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><h2 className="font-display text-lg font-semibold">Current assignment</h2><div className="mt-5 space-y-4 text-sm"><div className="flex gap-3"><UserRound size={16} className="mt-0.5 text-moss" /><div><p className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Employee</p>{employee ? <Link href={`/employees/${employee.id}`} className="mt-1 block font-medium text-moss hover:underline">{employee.name}</Link> : <p className="mt-1 text-ink/50">Not assigned</p>}</div></div><div className="flex gap-3"><MapPin size={16} className="mt-0.5 text-moss" /><div><p className="text-[10px] uppercase tracking-[0.1em] text-ink/35">Location</p><p className="mt-1 text-ink/60">{location?.name ?? 'Not in storage'}</p></div></div></div></section>{asset.notes && <section className="border border-[#dfe5df] bg-white p-5 sm:p-6"><h2 className="font-display text-lg font-semibold">Notes</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/60">{asset.notes}</p></section>}</aside>
+    </div>
+  </div>;
+}

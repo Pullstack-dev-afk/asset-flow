@@ -14,3 +14,8 @@ button, input { font: inherit; }
 	.app-shell { overflow-x: hidden; }
 	button, a, select { min-height: 40px; }
 }
+@media print {
+	body { background: white; }
+	aside, body > button, body > div > div > button { display: none !important; }
+	.app-shell { padding: 0 !important; }
+}
